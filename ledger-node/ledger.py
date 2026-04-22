@@ -3,6 +3,9 @@ import hashlib
 import json
 import time
 import uuid
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import serialization
 
 app = Flask(__name__)
 
@@ -46,12 +49,45 @@ def proof_of_work(previous_hash):
 
         nonce += 1
 
+def verify_signature(transaction):
+    try:
+        public_key = serialization.load_pem_public_key(
+            transaction["public_key"].encode()
+        )
+
+        signature = bytes.fromhex(transaction["signature"])
+
+        message = json.dumps({
+            "user": transaction["user"],
+            "amount": transaction["amount"]
+        }, sort_keys=True).encode()
+
+        public_key.verify(
+            signature,
+            message,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+
+        return True
+    except Exception:
+        return False
+
+
 @app.route("/transaction", methods=["POST"])
 def add_transaction():
     data = request.json
 
-    if not data or "user" not in data or "amount" not in data:
-        return {"error": "invalid transaction"}, 400
+    required = ["user", "amount", "signature", "public_key"]
+
+    if not all(k in data for k in required):
+        return {"error": "invalid transaction format"}, 400
+
+    if not verify_signature(data):
+        return {"error": "invalid signature"}, 400
 
     transaction = {
         "id": str(uuid.uuid4()),
@@ -61,7 +97,7 @@ def add_transaction():
 
     current_transactions.append(transaction)
 
-    return {"status": "added to pending"}
+    return {"status": "verified and added"}
 
 
 @app.route("/mine", methods=["GET"])
