@@ -41,12 +41,14 @@ def get_public_key():
 def bid():
     data = request.json
 
-    # 🔐 validar input
+    # validar input
     if not data or "user" not in data or "amount" not in data:
         return {"error": "invalid input"}, 400
 
     try:
+        import uuid
         tx = {
+            "id": str(uuid.uuid4()),
             "user": data["user"],
             "amount": data["amount"]
         }
@@ -56,10 +58,10 @@ def bid():
         tx["signature"] = signature
         tx["public_key"] = get_public_key()
 
-        # 📡 enviar para ledger
+        # enviar para ledger
         response = requests.post(f"{LEDGER_URL}/transaction", json=tx)
 
-        # 🔎 verificar resposta do ledger
+        # verificar resposta do ledger
         if response.status_code != 200:
             return {
                 "error": "ledger rejected transaction",

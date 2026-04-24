@@ -7,6 +7,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import serialization
 
+seen_transactions = set()
+
 app = Flask(__name__)
 
 blockchain = []
@@ -58,6 +60,7 @@ def verify_signature(transaction):
         signature = bytes.fromhex(transaction["signature"])
 
         message = json.dumps({
+            "id": transaction["id"],
             "user": transaction["user"],
             "amount": transaction["amount"]
         }, sort_keys=True).encode()
@@ -81,11 +84,11 @@ def is_chain_valid():
         current = blockchain[i]
         previous = blockchain[i - 1]
 
-        # 🔗 verificar ligação entre blocos
+        # verificar ligação entre blocos
         if current["previous_hash"] != hash_block(previous):
             return False
 
-        # 🔐 verificar Proof of Work
+        # verificar Proof of Work
         block_copy = current.copy()
         hash_result = hash_block(block_copy)
 
@@ -108,8 +111,16 @@ def add_transaction():
     if not verify_signature(data):
         return {"error": "invalid signature"}, 400
 
+    tx_id = data.get("id")
+
+    # evitar duplicados
+    if tx_id in seen_transactions:
+        return {"error": "duplicate transaction"}, 400
+
+    seen_transactions.add(tx_id)
+
     transaction = {
-        "id": str(uuid.uuid4()),
+        "id": tx_id,
         "user": data["user"],
         "amount": data["amount"]
     }
@@ -149,7 +160,6 @@ def validate_chain():
         "valid": valid,
         "length": len(blockchain)
     }
-
 
 # Create genesis block
 if len(blockchain) == 0:
