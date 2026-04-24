@@ -76,6 +76,25 @@ def verify_signature(transaction):
     except Exception:
         return False
 
+def is_chain_valid():
+    for i in range(1, len(blockchain)):
+        current = blockchain[i]
+        previous = blockchain[i - 1]
+
+        # 🔗 verificar ligação entre blocos
+        if current["previous_hash"] != hash_block(previous):
+            return False
+
+        # 🔐 verificar Proof of Work
+        block_copy = current.copy()
+        hash_result = hash_block(block_copy)
+
+        if not hash_result.startswith("000"):
+            return False
+
+    return True
+
+
 
 @app.route("/transaction", methods=["POST"])
 def add_transaction():
@@ -120,6 +139,17 @@ def mine():
 @app.route("/chain", methods=["GET"])
 def get_chain():
     return jsonify(blockchain)
+
+
+@app.route("/validate", methods=["GET"])
+def validate_chain():
+    valid = is_chain_valid()
+
+    return {
+        "valid": valid,
+        "length": len(blockchain)
+    }
+
 
 # Create genesis block
 if len(blockchain) == 0:
